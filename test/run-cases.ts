@@ -13,3 +13,5 @@ for (const c of CASES) {
   console.log(`${good ? 'ok  ' : 'MISS'} ${c.word.padEnd(10)} → ${r.best?.name ?? '-'} (${r.margin.toFixed(2)}): ${(r.best?.definition ?? '').slice(0, 70)}${good ? '' : `\n       wanted "${c.want}"; top 3: ${r.ranked.slice(0, 3).map((x) => `${x.name} ${x.score.toFixed(3)} [${(x.definition ?? '').slice(0, 40)}]`).join(' | ')}`}`);
 }
 console.log(`\n${ok}/${CASES.length} right (always the commonest sense: ${base}/${CASES.length})`);
+// (A regression gate: the hand cases scored 23/30 on 2026-10-23.)
+if (ok < 22) { console.error(`hand cases fell to ${ok}/${CASES.length}`); process.exit(1); }

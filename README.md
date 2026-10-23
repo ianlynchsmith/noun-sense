@@ -44,25 +44,44 @@ the later literature learnt:
 
 ## Use
 
+Install with `npm install github:ianlynchsmith/noun-sense` (it builds itself), or run it without installing:
+`npx github:ianlynchsmith/noun-sense sage "the sage is in the soup"`. Node 22.6 or later.
+
+### Command line
+
 ```
-npm install -g noun-sense          # or: npx noun-sense …
-noun-sense <word> <passage…>       # the sense meant, and the runners-up
-noun-sense <word> - < article.txt  # the passage from stdin
-noun-sense court --senses          # list a word's senses
+noun-sense <word> <passage…>              # the sense meant, and the runners-up
+noun-sense <word> - < article.txt         # the passage from stdin
+noun-sense court --senses                 # list a word's senses
 noun-sense court "…" --among "law,game"   # choose only among senses whose name or definition has these
-noun-sense bank "…" --json
+noun-sense --about - < article.txt        # what a passage is about
+noun-sense bank "…" --json                # any of these as JSON
 ```
+
+### Library
 
 ```ts
-import { loadNet } from 'noun-sense';
+import { loadNet } from 'noun-sense';                  // Node: reads the bundled data
+// import { loadNetFromUrl } from 'noun-sense/browser'; // browser: await loadNetFromUrl('/nouns.json.gz')
 const net = loadNet();
-const r = net.choose('pool', sceneText, { among: [...net.find('pool', 'swimming'), ...net.find('poolroom')] });
-r.best;       // the sense: { id, name, lexfile, definition, score }
-r.confident;  // the passage said enough; otherwise keep your own default
+
+net.choose('bank', text);                                // { best, ranked, margin, confident }
+net.choose('pool', text, { among: [...net.find('pool', 'swimming'), ...net.find('poolroom')] });
+net.about(text);                                         // [{ name, definition, score, words }] — what it converges on
+net.related('sage', 'soup');                             // { score 0–1, a, b } — the closest pair of senses (rough)
+net.sensesOf('court');                                   // sense ids, commonest first
+net.sense(id);                                           // { id, name, lexfile, definition }
+net.find('court', 'law');                                // senses whose name or definition has "law"
+net.lemma('glasses');                                    // the word as the network knows it
 ```
 
-`net.find(word, hint)` names candidates. A caller choosing between its own readings (rooms, places, products) does best
-to give the concepts it means as `among`: the place, not the activity ("poolroom", not "pocket billiards").
+- **`choose`.** `best` is the sense with its `score`. `confident` is false when the passage said too little: keep your
+  own default then. `margin` (how far ahead the best is) is not a confidence.
+- **`among`.** A caller choosing between its own readings (rooms, places, products) does best to give the concepts it
+  means as `among`: the place, not the activity ("poolroom", not "pocket billiards"). With `among`, WordNet's
+  commonest-first order isn't applied, since it's the order of WordNet's own texts, not yours.
+- **Tuning.** `TUNE` holds the weights. The defaults were tuned on half of a set of screenplay scenes and checked on
+  the other half.
 
 ## How well it works
 
@@ -82,10 +101,36 @@ More text is better: scenes with 10–20 content words were right 97% of the tim
 Dialogue is a noisier context than reportage. `confident` is false when the best score is under 0.2; there it's close
 to a coin toss. The margin between senses is not a confidence.
 
+### What a news article is about
+
+`about()` climbs every noun of an article and reports the concepts that several different nouns converge on. Each word
+counts through the sense the article settled for it, and dates and numbers are left out. Ten articles, fetched
+2026-10-23, with the top concepts it found (the words behind each in brackets):
+
+| article | what it found |
+|---|---|
+| [Shaquille O'Neal launches a signature fragrance at JCPenney](https://mr-mag.com/shaquille-oneal-launches-first-signature-fragrance-available-only-at-jcpenney/) (98 words) | capitalist (investor, owner, retailer); business (partnership, restaurant); mercantile establishment; commodity. **Business, not basketball.** |
+| [Jayson Tatum, the face of Coach's men's fragrance](https://www.hollywoodreporter.com/lifestyle/style/jayson-tatum-boston-celtics-coach-fragrance-interview-1236193242/) (1,183) | odour (smell, scent, fragrance); leather; wood (woody, cedar), the scent's notes; armed forces (fight, war, strategy), his playoff metaphors |
+| [Two Upper Peninsula banks sign a merger agreement](https://www.wnmufm.org/business/2026-06-25/two-up-banks-sign-merger-agreement) (148) | bank; administrator (executive, director); merging; enterprise (corporation, bank) |
+| [Holiday airfares soar with jet fuel near a record](https://text.npr.org/nx-s1-6009506) (688) | cost (expense, fare, airfare); travel (trip, flying); dealing (deal, trade, industry). Also armed forces (prepared, major, pass), a miss. |
+| [Europe's heat claims 50,000 lives](https://text.npr.org/g-s1-149498) (923) | degree (intense, extreme, high); environment; temperature change (climate change, warming); math (equation, statistics) |
+| [Tom Skerritt, who played dads, cops and commanding officers, has died](https://text.npr.org/981035400) (240) | armed forces (commanding officer, captain, veteran); film (movie); military personnel; law officer (sheriff, cop) |
+| [Your guide to stain removal](https://text.npr.org/789172148) (626) | condiment (vinegar, salad dressing, mayonnaise); liquid (ink, ammonia, red wine); edible fruit (berry, grape); stain; colour; garment (shirt, sleeve) |
+| [Brazil's runoff: Lula's legacy vs. Bolsonaro's dynasty](https://text.npr.org/nx-s1-6004277) (630) | triumph (victory, win, sweep); difference (inequality, gap); competition (race, campaign). Also armed forces (major, fight, division), a miss. |
+| [Hacking attempts rise after flaws found in a program used by 70% of websites](https://text.npr.org/g-s1-149503) (445) | computer science (programming language, software, website, hacker, internet); difficulty (severe, crisis, urgent); organisation (government) |
+| [See how Big Tech is transforming Spain's landscape](https://text.npr.org/nx-s1-5991641) (1,568) | economic system (economy, capitalism); people (population, public); air current (wind, thermal); bird of prey (vulture, osprey, golden eagle), the article's wildlife on the plains |
+
+It gets the gist of most of them. Most clearly, the basketball stars' fragrance launches come out as business and
+fragrance, not sport. The misses are of two kinds:
+- **Common words' rare senses.** Major, fight, pass and division are all military; "armed forces" turns up in three
+  articles.
+- **The body's parts** in long articles.
+
 Limits:
 
 - It chooses among a word's senses. A name (a bar called River Dance) isn't one.
 - WordNet's senses are finer than homonyms. Give `among` when only some readings matter.
+- `related()` is a rough measure: court–tennis comes out through the law court.
 
 ## Data
 

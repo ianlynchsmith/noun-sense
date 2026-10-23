@@ -70,6 +70,9 @@ const STOP = new Set(('a an the of or and to in on for with by as at from that w
   'int ext cont continuous later same')
   .split(' '));
 
+/** Lexicographer files that are never an answer to "what is this about". */
+const NOT_ABOUT = new Set(['time', 'quantity', 'Tops', 'relation', 'shape']);
+
 export class NounNet {
   readonly d: NounData;
   private lemmaIdx = new Map<string, number>();
@@ -150,10 +153,15 @@ export class NounNet {
 
   /** What a passage lights: every distinct word's climb, added up. */
   context(words: string[], skip: Set<string> = new Set(), targets: string[] = []): Act {
+    return this.lit(words, skip, targets).total;
+  }
+
+  /** The passage's light, and each of its words' share of it. */
+  lit(words: string[], skip: Set<string> = new Set(), targets: string[] = []): { total: Act; parts: { word: string; act: Act; senses: number[]; w: number[] }[] } {
     const named = targets.length && TUNE.bridge > 0 ? new RegExp(`\\b(?:${targets.map((t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})s?\\b`, 'i') : null;
     const bridges: Act[] = [];
     // Each distinct word, its senses, and their weights (commonest first to start).
-    const ws: { senses: number[]; w: number[] }[] = [];
+    const ws: { word: string; senses: number[]; w: number[] }[] = [];
     const seen = new Set<string>();
     for (const word of words) {
       const l = this.lemma(word);
@@ -163,7 +171,7 @@ export class NounNet {
       if (!senses.length) continue;
       const prior = senses.map((_, j) => 1 / (j + 1) ** TUNE.prior);
       const sum = prior.reduce((a, b) => a + b, 0);
-      ws.push({ senses, w: prior.map((p) => p / sum) });
+      ws.push({ word: l, senses, w: prior.map((p) => p / sum) });
       // (Gated: only a sense whose definition names the word in question, so a word's first-sense gloss doesn't spray.)
       if (named) for (const sn of senses) {
         if (!named.test(this.d.defs?.[sn] ?? '')) continue;
@@ -176,7 +184,7 @@ export class NounNet {
         bridges.push(a);
       }
     }
-    const light = (x: { senses: number[]; w: number[] }) => { const out: Act = new Map(); x.senses.forEach((sn, j) => this.climb(sn, x.w[j], out)); return out; };
+    const light = (x: { word: string; senses: number[]; w: number[] }) => { const out: Act = new Map(); x.senses.forEach((sn, j) => this.climb(sn, x.w[j], out)); return out; };
     let maps = ws.map(light);
     const sumUp = () => { const t: Act = new Map(); for (const m of [...maps, ...bridges]) for (const [k, v] of m) t.set(k, (t.get(k) ?? 0) + v); return t; };
     let total = sumUp();
@@ -194,7 +202,7 @@ export class NounNet {
       maps = ws.map(light);
       total = sumUp();
     }
-    return total;
+    return { total, parts: ws.map((x, i) => ({ word: x.word, act: maps[i], senses: x.senses, w: x.w })) };
   }
 
   /** A sense's signature: what's above it, and above its definition's nouns. */
@@ -242,6 +250,65 @@ export class NounNet {
     const [a, b] = ranked;
     const margin = !a || a.score <= 0 ? 0 : b ? (a.score - b.score) / a.score : 1;
     return { word: l, best: a && a.score > 0 ? a : null, ranked, margin, confident: !!a && a.score >= TUNE.sure };
+  }
+
+  /**
+   * What a passage is about: the concepts its nouns converge on. A concept counts by the light it gathers from
+   * different words (at least `minWords` of them) times how specific it is, so "entity" never wins and neither does one
+   * word's own meaning; each one taken leaves out its ancestors and descendants, so the list isn't one idea five times.
+   */
+  about(passage: string | string[], opts: { top?: number; minWords?: number; specPow?: number } = {}): { id: number; name: string; lexfile: string; definition?: string; score: number; words: string[] }[] {
+    const top = opts.top ?? 8, specPow = opts.specPow ?? 1.5;
+    const words = Array.isArray(passage) ? passage : this.tokens(passage);
+    const lit = this.lit(words);
+    // Each word through the sense the passage settled on (a near tie shared): company is the business here, not the
+    // army's unit, so "armed forces" isn't lit by every article that says company, major and fight.
+    const parts = lit.parts.map((x) => {
+      const best = Math.max(...x.w), keep = x.senses.map((sn, j) => [sn, x.w[j]] as const).filter(([, w]) => w >= best * 0.8);
+      const act: Act = new Map();
+      for (const [sn, w] of keep) this.climb(sn, w / keep.reduce((a, [, b]) => a + b, 0), act);
+      return { word: x.word, act };
+    });
+    const total: Act = new Map();
+    for (const x of parts) for (const [k, v] of x.act) total.set(k, (total.get(k) ?? 0) + v);
+    const minWords = opts.minWords ?? Math.min(3, Math.max(2, Math.round(parts.length / 40)));
+    const scored: { id: number; score: number; words: [string, number][] }[] = [];
+    for (const [k, v] of total) {
+      const from = parts.filter((x) => (x.act.get(k) ?? 0) > 0.02).map((x) => [x.word, x.act.get(k)!] as [string, number]);
+      if (from.length < minWords) continue;
+      // (Dates, numbers and the top of the tree are dimensions of a passage, never what it's about.)
+      if (NOT_ABOUT.has(this.d.lexfile[k])) continue;
+      scored.push({ id: k, score: v * this.spec[k] ** specPow, words: from.sort((a, b) => b[1] - a[1]) });
+    }
+    scored.sort((a, b) => b.score - a.score);
+    const above = (i: number) => { const out = new Set<number>(); const st = [i]; while (st.length) { const x = st.pop()!; for (const p of this.d.parents[x]) if (!out.has(p)) { out.add(p); st.push(p); } } return out; };
+    const taken: { id: number; up: Set<number> }[] = [];
+    const out = [];
+    for (const c of scored) {
+      if (out.length >= top) break;
+      const up = above(c.id);
+      if (taken.some((t) => t.up.has(c.id) || up.has(t.id))) continue;
+      taken.push({ id: c.id, up });
+      out.push({ ...this.sense(c.id), score: c.score, words: c.words.slice(0, 5).map(([w]) => w) });
+    }
+    return out;
+  }
+
+  /**
+   * How close two words are, 0–1: the best pair of their senses, by how much their signatures share (specific concepts
+   * counting most). sage–soup is high through the herb; sage–philosopher through the wise man.
+   */
+  related(a: string, b: string): { score: number; a: Sense | null; b: Sense | null } {
+    let best = { score: 0, a: null as Sense | null, b: null as Sense | null };
+    for (const x of this.sensesOf(a).slice(0, 8)) for (const y of this.sensesOf(b).slice(0, 8)) {
+      const sx = this.signature(x), sy = this.signature(y);
+      let dot = 0, nx = 0, ny = 0;
+      for (const [k, v] of sx) { const s2 = this.spec[k] ** 2; nx += v * v * s2; const w = sy.get(k); if (w) dot += v * w * s2; }
+      for (const [k, v] of sy) ny += v * v * this.spec[k] ** 2;
+      const c = nx && ny ? dot / Math.sqrt(nx * ny) : 0;
+      if (c > best.score) best = { score: c, a: this.sense(x), b: this.sense(y) };
+    }
+    return best;
   }
 
   /** Senses whose name or definition says this (for naming candidates: find('court', 'law') → the court of law). */

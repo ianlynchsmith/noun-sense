@@ -3,6 +3,7 @@
  * noun-sense <word> <passage…>     which sense of <word> the passage means
  *   --among "hint1,hint2"          choose only among senses whose name or definition has one of these (e.g. "law,game")
  *   --senses                       list the word's senses and stop
+ * noun-sense --about <passage…>    what the passage is about: the concepts its nouns converge on
  *   --json                         machine-readable output
  *   -                              read the passage from stdin
  */
@@ -12,10 +13,18 @@ import { loadNet } from './load.ts';
 const args = process.argv.slice(2);
 const flag = (name: string) => { const i = args.indexOf(name); if (i < 0) return undefined; const v = args[i + 1]; args.splice(i, 2); return v; };
 const has = (name: string) => { const i = args.indexOf(name); if (i < 0) return false; args.splice(i, 1); return true; };
-const json = has('--json'), list = has('--senses'), among = flag('--among');
+const json = has('--json'), list = has('--senses'), aboutIt = has('--about'), among = flag('--among');
+if (aboutIt) {
+  const text = args.length === 1 && args[0] === '-' ? readFileSync(0, 'utf8') : args.join(' ');
+  if (!text.trim()) { console.error('noun-sense: give a passage (or "-" for stdin)'); process.exit(1); }
+  const found = loadNet().about(text);
+  if (json) console.log(JSON.stringify(found, null, 2));
+  else for (const a of found) console.log(`${a.score.toFixed(2).padStart(6)}  ${a.name}  ← ${a.words.join(', ')}`);
+  process.exit(0);
+}
 const [word, ...rest] = args;
 if (!word || word === '-h' || word === '--help') {
-  console.log('usage: noun-sense <word> <passage…> [--among "hint,hint"] [--senses] [--json]   (passage "-" reads stdin)');
+  console.log('usage: noun-sense <word> <passage…> [--among "hint,hint"] [--senses] [--json]\n       noun-sense --about <passage…> [--json]   (passage "-" reads stdin)');
   process.exit(word ? 0 : 1);
 }
 const net = loadNet();
