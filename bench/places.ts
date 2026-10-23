@@ -1,3 +1,5 @@
+// Benchmark on screenplay scenes: node --experimental-strip-types bench/places.ts items.json
+// items.json (not included: the scenes are copyrighted scripts) is [{ file, word, text, action, among, truth, group }].
 import { readFileSync } from 'node:fs';
 import { TUNE } from '../src/net.ts';
 import { loadNet } from '../src/load.ts';
