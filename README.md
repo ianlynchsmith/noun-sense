@@ -10,6 +10,7 @@ $ noun-sense bank - < merger-story.txt
 bank → bank: a financial institution that accepts deposits and channels the money into lending activities
 
 $ noun-sense --about - < shaq-fragrance-story.txt
+  0.76  name  ← name, signature
   0.45  capitalist  ← investor, owner, retailer
   0.38  business  ← partnership, restaurant
   0.23  mercantile establishment  ← release, shelf
@@ -30,7 +31,8 @@ in Node or a browser.
 
 ## The method
 
-The idea is Ian Lynch Smith's, from his Vassar thesis (1992), which disambiguated the homonyms in news articles:
+The idea is Ian Lynch Smith's, from his Vassar thesis (1992). Its first goal was to disambiguate the homonyms in
+news articles, its second to find what an article is about. Both come from the same climb:
 
 1. **Build the hierarchy.** Take a dictionary and build a hierarchy from every noun's head noun ("a fork is a utensil,
    a utensil is a tool, a tool is an object…"). The result is a small, fast, static network over all the nouns.
@@ -39,6 +41,10 @@ The idea is Ian Lynch Smith's, from his Vassar thesis (1992), which disambiguate
 3. **Take the sense that's most activated.** "Sage" and "soup" meet at food; a wise man and soup don't meet at all.
    The longer the article, the more its nouns' higher concepts agree. A sentence has a few nouns to go on; an
    article has hundreds.
+
+4. **What the article is about** is where the climbs converge most: the concepts that many different nouns reach.
+   A basketball star launching a cologne is a little about basketball and mostly about business and fashion
+   (`about()`, below).
 
 The hierarchy here is Open English WordNet's (71,864 noun concepts), so step 1 comes ready made. The scoring adds what
 the later literature learnt:
