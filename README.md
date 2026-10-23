@@ -63,8 +63,8 @@ the later literature learnt:
 
 ## Use
 
-Install with `npm install github:ianlynchsmith/noun-sense` (it builds itself), or run it without installing:
-`npx github:ianlynchsmith/noun-sense sage "the sage is in the soup"`. Node 22.6 or later.
+Install with `npm install noun-sense` (or `npm install -g noun-sense` for the command), or run it without installing:
+`npx noun-sense sage "the sage is in the soup"`. Node 22.6 or later. On npm: https://www.npmjs.com/package/noun-sense
 
 ### Command line
 
