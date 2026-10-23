@@ -1,6 +1,21 @@
 # noun-sense
 
-Which sense of a noun a passage means, by where the passage's other nouns converge.
+Which sense of a noun an article means, and what the article is about, by where all its nouns converge.
+
+It's built for whole texts: a news article, a report, a chapter, a scene. The method comes from a thesis tested on news
+articles, more than 90% right on homonyms. Every noun in the text is evidence, so more text is better.
+
+```
+$ noun-sense bank - < merger-story.txt
+bank → bank: a financial institution that accepts deposits and channels the money into lending activities
+
+$ noun-sense --about - < shaq-fragrance-story.txt
+  0.45  capitalist  ← investor, owner, retailer
+  0.38  business  ← partnership, restaurant
+  0.23  mercantile establishment  ← release, shelf
+```
+
+A sentence works too when it has nouns enough to go on:
 
 ```
 $ noun-sense sage "the sage is in the soup"
@@ -8,9 +23,6 @@ sage → sage: aromatic fresh or dried grey-green leaves used widely as seasonin
 
 $ noun-sense sage "the sage gave his disciples advice about the meaning of life"
 sage → sage: a mentor in spiritual and philosophical topics who is renowned for profound wisdom
-
-$ noun-sense bank "she hands the teller her deposit slip and counts the cash"
-bank → bank: a financial institution that accepts deposits and channels the money into lending activities
 ```
 
 Small, fast, deterministic, no model and no network: a 3.6 MB data file and a few hundred lines of TypeScript. It runs
@@ -18,14 +30,15 @@ in Node or a browser.
 
 ## The method
 
-The idea is Ian Lynch Smith's, from his Vassar thesis (1992):
+The idea is Ian Lynch Smith's, from his Vassar thesis (1992), which disambiguated the homonyms in news articles:
 
 1. **Build the hierarchy.** Take a dictionary and build a hierarchy from every noun's head noun ("a fork is a utensil,
    a utensil is a tool, a tool is an object…"). The result is a small, fast, static network over all the nouns.
-2. **Climb it for every noun in the passage** and see where the climbs overlap. A paragraph set on a river climbs to
+2. **Climb it for every noun in the article** and see where the climbs overlap. An article set on a river climbs to
    water and terrain. One about a bar called River Dance climbs to business and alcohol.
 3. **Take the sense that's most activated.** "Sage" and "soup" meet at food; a wise man and soup don't meet at all.
-   The longer the passage, the more the nouns' higher concepts agree.
+   The longer the article, the more its nouns' higher concepts agree. A sentence has a few nouns to go on; an
+   article has hundreds.
 
 The hierarchy here is Open English WordNet's (71,864 noun concepts), so step 1 comes ready made. The scoring adds what
 the later literature learnt:
