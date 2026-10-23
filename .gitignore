@@ -1,0 +1,4 @@
+node_modules/
+dist/
+data/nouns.json
+*.xml.gz

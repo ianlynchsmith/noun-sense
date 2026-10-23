@@ -1,0 +1,22 @@
+{
+  "name": "noun-sense",
+  "version": "0.1.0",
+  "description": "Which sense of a noun a passage means: climb every noun's hierarchy and see where they converge (Open English WordNet).",
+  "type": "module",
+  "bin": { "noun-sense": "dist/cli.js" },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "files": ["dist", "data/nouns.json.gz", "NOTICE", "README.md", "LICENSE"],
+  "engines": { "node": ">=22.6" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "data": "node scripts/build.mjs",
+    "test": "node --experimental-strip-types --no-warnings test/run-cases.ts",
+    "start": "node --experimental-strip-types --no-warnings src/cli.ts"
+  },
+  "keywords": ["word sense disambiguation", "wordnet", "nlp", "homonym", "hypernym", "spreading activation"],
+  "author": "Ian Lynch Smith",
+  "license": "MIT",
+  "devDependencies": { "typescript": "^5.9.3", "@types/node": "^22.10.0" }
+}
